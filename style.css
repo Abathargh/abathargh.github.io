@@ -1,0 +1,39 @@
+body {
+    padding-left: 1em;;
+    font-family: Consolas;
+    font-size: 12;
+    width: 35em;
+    overflow: hidden;
+}
+
+h4 {
+    font-style: italic;
+}
+
+p {
+    text-align: justify;
+}
+
+a {
+    color: #01d4b4;
+    text-decoration: none;
+}
+
+a:visited {
+    color: #01d4b4;
+    text-decoration: none;
+}
+
+a:hover {
+    color: #01d4b4;
+    text-decoration: underline;
+}
+
+ul {
+    list-style: circle;
+    padding-left: 1em;
+}
+
+li {
+    margin-bottom: 1em;
+}
