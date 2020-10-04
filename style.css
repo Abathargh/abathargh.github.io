@@ -1,13 +1,23 @@
 body {
-    padding-left: 1em;;
+    padding-left: 1em;
     font-family: Consolas;
-    font-size: 12;
+    font-size: 0.75em;
     width: 35em;
-    overflow: hidden;
 }
 
 h4 {
+    overflow: hidden;
     font-style: italic;
+}
+
+h4:before {
+    content: "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\A\A";
+    white-space: pre-wrap;
+}
+
+h4:after {
+    content: "\A\A~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
+    white-space: pre-wrap;
 }
 
 p {
