@@ -2,7 +2,20 @@ body {
     padding-left: 1em;
     font-family: Consolas;
     font-size: 0.75em;
+    width: 70em;
+    display: grid;
+    grid-template-columns: 55% 55%;
+    grid-template-rows: 22em 20em 22em;
+}
+
+table {
+    width: 100%;
+}
+
+.section {
     width: 35em;
+    height: 25em;
+    margin-right: 15em;
 }
 
 h4 {
@@ -31,7 +44,7 @@ a {
     text-decoration: none;
 }
 
-a:viited {
+a:visited {
     color: #01d4b4;
     text-decoration: none;
 }

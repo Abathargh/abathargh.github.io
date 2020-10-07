@@ -1,63 +1,110 @@
+<!DOCTYPE html>
 <html lang="en, it">
 
 <head>
 	<title>G.Marcello - About</title>
 	<link rel="stylesheet" type="text/css" href="style.css">
 	<link rel="icon" href="antima_icon.png" sizes="32x32" />
+	<script src="parse_wheel.js"></script>
 </head>
 
 <body>
-	<h4>Gianmarco Marcello - About</h4>
-	<ul>
-		<li>
-			<p>B.Eng (Laurea in Ingegneria) in Computer Engineering from the Universit&agrave; della Calabria (UNICAL)</p>
-			<p style="padding-left: 5em;">Thesis: A study on technological solutions for the analysis and classification
-				of
-				human activities based on M2M communication systems and models; <a href="thesis.html">Abstract</a>
-			</p>
-		</li>
-		<li>
-			<p>Enrolled in the second year of the M.Eng (Laurea Magistrale in Ingegneria) in Computer Engineering for
-				the Internet of Things at Univerit&agrave; della Calabria (UNICAL)</p>
-		</li>
-	</ul>
+	<div class="section">
+		<h4>Gianmarco Marcello - About</h4>
+		<ul>
+			<li>
+				<p>B.Eng (Laurea in Ingegneria) in Computer Engineering from the Universit&agrave; della Calabria
+					(UNICAL)
+				</p>
+				<p style="padding-left: 5em;">Thesis: A study on technological solutions for the analysis and
+					classification
+					of
+					human activities based on M2M communication systems and models; <a href="thesis.html">Abstract</a>
+				</p>
+			</li>
+			<li>
+				<p>Enrolled in the second year of the Master's Degree (Laurea Magistrale in Ingegneria) in Computer
+					Engineering
+					for
+					the Internet of Things at Univerit&agrave; della Calabria (UNICAL)</p>
+			</li>
+		</ul>
+	</div>
+	<div class="section">
+		<h4>Music</h4>
+		<p>Dripping Sin, Guitar/Voices (Thrash/Alt. Metal)</p>
+		<ul>
+			<li><a href="https://soundcloud.com/dripping-sin/sets/gaze-into-the-abyss	">Gaze into the Abyss</a>
+				(2017)
+			</li>
+			<li><a href="https://soundcloud.com/dripping-sin/sets/crimson-lies">Crimson Lies</a> (2016)</li>
+			<li><a href="https://soundcloud.com/dripping-sin/sets/sorceress-of-evil">Sorceress of Evil</a> (2014)
+			</li>
+		</ul>
+		<p>Soundcloud stuff (Covers, electronic, instrumentals)</p>
+		<ul>
+			<li><a href="https://soundcloud.com/abathargh">Abathargh</a></li>
+		</ul>
+	</div>
+	<div class="section">
+		<h4>Projects</h4>
+		<ul>
+			<li>
+				<p><a href="https://antima.it">antima.it</a>, a website that I manage and in which I write, mainly
+					about
+					programming and computer engineering. </p>
+			</li>
+			<li>
+				<p><a href="https://github.com/Abathargh/moody-go">Moody</a>, a WSAN architecture for managing
+					local-first
+					intranet of things networks for home automation purposes.</p>
+			</li>
+			<li>
+				<p><a href="https://github.com/Abathargh/toonnel">Toonnel</a>, a library that allows the usage of Go
+					channels
+					as an abstraction to connect remote machines via TCP sockets.</p>
+			</li>
+		</ul>
+	</div>
+	<div class="section">
+		<h4>Useful stuff</h4>
+		<ul>
+			<li>
+				<p><a href="https://github.com/Abathargh/python3-arm-wheels">Arm wheels</a> for various arm
+					architectures,
+					containing pre-built wheels for lots of widely used python libraries. They can be searched from the
+					section below.
+				</p>
+			</li>
+			<li>
+				<p><a href="https://github.com/Abathargh/buildx-all">buildx-all</a>, a script for building and
+					pushing
+					multi-arch docker images for each sub-dir containing a dockerfile in a directory.</p>
+			</li>
+		</ul>
+	</div>
+	<div class="section">
+		<h4>Contacts</h4>
+		<ul>
+			<li><a href="https://github.com/abathargh">abathargh</a> on Github</li>
+			<li>@AtomHeartm on Twitter</li>
+			<li>g.marcello[at]antima.it</li>
+		</ul>
+		<br />
+		<br />
+		(c) G.Marcello 2020
+	</div>
+	<div class="section">
+		<h4>Search wheel</h4>
+		<table>
+			<tr>
+				<td>Search (<i>library</i>:<i>pyversion</i>:<i>arch</i>)</td>
+				<td><input type="text" oninput="showWheels(this.value)" /></td>
+			</tr>
+		</table>
+		<div id="results"></div>
+	</div>
 
-	<h4>Projects</h4>
-	<ul>
-		<li>
-			<p><a href="https://antima.it">antima.it</a>, a website that I manage and in which I write, mainly about
-				programming and computer engineering. </p>
-		</li>
-		<li>
-			<p><a href="https://github.com/Abathargh/moody-go">Moody</a>, a WSAN architecture for managing local-first
-				intranet of things networks for home automation purtposes.</p>
-		</li>
-		<li>
-			<p><a href="https://github.com/Abathargh/toonnel">Toonnel</a>, a library that allows the usage of Go
-				channels
-				as an abstraction to connect remote machines via TCP sockets.</p>
-		</li>
-	</ul>
-	<h4>Useful stuff</h4>
-	<ul>
-		<li>
-			<p><a href="https://github.com/Abathargh/python3-arm-wheels">Arm wheels</a> for various arm architectures,
-				containing pre-built wheels for lots of widely used python libraries.
-			</p>
-		</li>
-		<li>
-			<p><a href="https://github.com/Abathargh/buildx-all">buildx-all</a>, a script for building and pushing
-				multi-arch docker images for each sub-dir containing a dockerfile in a directory.</p>
-		</li>
-	</ul>
-	<h4>Contacts</h4>
-	<ul>
-		<li>@AtomHeartm on Twitter</li>
-		<li>g.marcello[at]antima.it</li>
-	</ul>
-	<br />
-	<br />
-	(c) G.Marcello 2020
 </body>
 
 </html>
