@@ -80,9 +80,9 @@ function showWheels(query) {
         x => {
             return "<li>" +
                 ("url" in x ? String.raw`<a href="` + x.url + `">` + x.name + `</a>` :
-                    String.raw`<a href="#" onclick="setDir('` + x.name + `')">` + x.name + `</a>`)
+                    String.raw`<a href="#" onclick="setDir('` + x.name + `');event.preventDefault();">` + x.name + `</a>`)
                 + "</li>";
         }
     ).join("") +
-        String.raw`<li style="list-style:square;"><a style="color: #008874;" href="#" onclick="previousDir()">Previous dir</a></li></ul>`;
+        String.raw`<li style="list-style:square;"><a style="color: #008874;" href="#" onclick="previousDir();event.preventDefault();">Previous dir</a></li></ul>`;
 }
