@@ -5,7 +5,7 @@ body {
     width: 70em;
     display: grid;
     grid-template-columns: 55% 55%;
-    grid-template-rows: 20em 20em 22em;
+    grid-template-rows: 22em 22em 22em;
 }
 
 table {
@@ -14,7 +14,7 @@ table {
 
 .section {
     width: 35em;
-    height: 25em;
+    height: em;
     margin-right: 15em;
 }
 
