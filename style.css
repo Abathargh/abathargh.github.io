@@ -1,6 +1,6 @@
 body {
     padding-left: 1em;
-    font-family: Consolas;
+    font-family: Consolas, DejaVu Sans Mono;
     font-size: 0.75em;
     width: 70em;
     display: grid;
