@@ -3,9 +3,10 @@ body {
     font-family: Consolas, DejaVu Sans Mono;
     font-size: 0.75em;
     width: 70em;
+    height: 120vh;
     display: grid;
     grid-template-columns: 55% 55%;
-    grid-template-rows: 24em 24em 24em;
+    grid-template-rows: auto auto auto;
 }
 
 table {
@@ -17,6 +18,7 @@ table {
     height: 15em;
     margin-right: 15em;
 }
+
 
 h4 {
     overflow: hidden;
