@@ -1,0 +1,84 @@
+body {
+  background-color: #1f1f1f;
+  color: rgba(187, 187, 187, 0.842);
+  padding-left: 1em;
+  font-family: Consolas, DejaVu Sans Mono;
+  font-size: 0.75em;
+  width: 70em;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 55% 55%;
+  grid-template-rows: auto auto auto;
+}
+
+table {
+  width: 100%;
+}
+
+.section {
+  width: 35em;
+  height: 100%;
+  margin-right: 15em;
+}
+
+
+h4 {
+  overflow: hidden;
+  font-style: italic;
+}
+
+h4:before {
+  content: "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\A\A";
+  white-space: pre-wrap;
+  font-weight: normal;
+}
+
+h4:after {
+  content: "\A\A~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~";
+  white-space: pre-wrap;
+  font-weight: normal;
+}
+
+p {
+  text-align: justify;
+}
+
+a {
+  color: rgb(94, 68, 165);
+  text-decoration: none;
+}
+
+a:visited {
+  color: rgb(94, 68, 165);
+  text-decoration: none;
+}
+
+a:hover {
+  color: rgb(94, 68, 165);
+  text-decoration: underline;
+}
+
+a.previous {
+  color: rgb(169, 141, 245);
+}
+
+ul {
+  list-style: circle;
+  padding-left: 1em;
+}
+
+li {
+  margin-bottom: 1em;
+}
+
+button {
+  border-color: rgb(94, 68, 165);
+  background-color: #1f1f1f;
+  color: rgba(187, 187, 187, 0.842);
+}
+
+input {
+  border-color: rgb(94, 68, 165);
+  background-color: #1f1f1f;
+  color: rgba(187, 187, 187, 0.842);
+}

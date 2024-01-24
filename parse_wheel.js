@@ -84,5 +84,5 @@ function showWheels(query) {
                 + "</li>";
         }
     ).join("") +
-        String.raw`<li style="list-style:square;"><a style="color: #008874;" href="#" onclick="previousDir();event.preventDefault();">Previous dir</a></li></ul>`;
-}
+    String.raw`<li style="list-style:square;"><a class="previous" href="#" onclick="previousDir();event.preventDefault();">Previous dir</a></li></ul>`;
+  }
