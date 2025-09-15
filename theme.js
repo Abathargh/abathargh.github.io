@@ -1,4 +1,4 @@
-var theme = "light";
+var theme = "dark";
 
 function switch_theme(elem) {
   var css = document.getElementById("stylesheet");
