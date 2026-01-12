@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>more nim for embedded software development</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <link rel="alternate" type="application/rss+xml" title="mar@antima" href="/feed.xml">
+  <link rel="icon" type="image/png" href="/images/antima_icon.png">
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <a href="/" class="site-title">mar@antima</a>
+      <nav class="nav-links">
+        <a href="/about/">about</a>
+        <a href="/feed.xml">rss</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="post-layout">
+  <aside class="post-sidebar" id="post-sidebar">
+    <nav class="toc">
+      <div class="toc-header">On this page</div>
+      <ul class="toc-list" id="toc-list"></ul>
+    </nav>
+  </aside>
+  <article class="post">
+    <header>
+      <h1>more nim for embedded software development</h1>
+      <time>11/01/2026</time>
+    </header>
+    <div class="content" id="post-content">
+      <p>Writing libraries is fun, but at some point you've got to use them. I've been writing one for roughly two years!</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/o4o0o2kz1f54qa6n0vew.png" alt="2 years" /></p>
+<p>Finally, I moved to writing a not-so-small project using said library (<code>avr_io</code> - <a href="https://github.com/Abathargh/avr_io">avr_io@github</a>), so it is with this newfound knowledge that I bring forth some thoughts about my freshly started nim-application-dev days.</p>
+<p>This is a loose sequel of a previous article, <a href="https://dev.to/abathargh/nim-for-embedded-software-development-33cc">nim for embedded software development</a>.</p>
+<p>Note: the following is <em>mainly</em> about bare-metal firmware for 8-bit microcontrollers, but it can be applied to other domains.</p>
+<h2>arc memory management</h2>
+<p>I have been experimenting a bit with arc and I like the &quot;don't pay for what you don't use&quot; kind of thing.</p>
+<p>Essentially, if you're not using <code>ref</code>-types you don't really notice arc, and you can use <code>string</code> and <code>seq</code> for relatively low cost in binary size.</p>
+<p>Still haven't experimented too much with size differences to have a precise measurement, but it's not too bad if you don't over-use allocations or some portions of the stdlib.</p>
+<p>If that does become bad, I have the following incantation that sequeezes quite a bit of KB from your binary:</p>
+<pre><code class="language-nims">switch(&quot;gc&quot;, &quot;none&quot;)
+switch(&quot;opt&quot;, &quot;size&quot;)
+switch(&quot;define&quot;, &quot;danger&quot;)
+</code></pre>
+<p>It also has been suggested to me to use <code>--execptions:quirky</code>, but in all honesty I don't use exceptions a lot.</p>
+<p>You have to be careful and really know what you're doing tho, with these flags. And some portions of the language may not work, like..</p>
+<h2>object variants</h2>
+<p>One thing were arc (or a mm ≠ none) may be needed is if you're using object variants.</p>
+<p>I was kind of surprised by this! Aren't they basically just safer tagged <code>union</code>s from C?</p>
+<pre><code class="language-nim">## An example of an object variant in use
+type
+  CmdKind* = enum
+    SetBpm
+    SetValue
+    SetAmplitude
+    SetEnvelope
+
+  Command* = object
+    case kind*: CmdKind
+    of SetBpm:
+      bpm*:       uint16
+    of SetValue:
+      value*:     NoteValue
+    of SetAmplitude:
+      amp_chan*:  uint8
+      amplitude*: uint8
+    of SetEnvelope:
+      envelope*:  EnvelopeShape
+      frequency*: uint16
+</code></pre>
+<p>The keyword here is <em>safer</em>; nim achieves this by:</p>
+<ul>
+<li>Forcing you to re-create the object instead of just switching the tag and possibly invalidate the underlying data.</li>
+<li>Raising an exception/panic whenever you access a field that is not tied to the active kind.</li>
+</ul>
+<p>This second bit is quite nice, because it allows you to catch runtime errors with custom panicoverride handles; for example, I just set up a blinking LED for this kind of stuff, so I have a visual cue that something went wrong.</p>
+<p>On the other side, the message passed to the panic handle is built with <code>appendString</code>, which implies at least using <code>-mm:arc --define:useMalloc</code>, so if you want to use object variants AND be safe about them, you cannot go with just <code>--mm:none</code>.</p>
+<p>I got three issues with this:</p>
+<ul>
+<li>It would be nice to maybe have a compiler flag that enforces compile-time checking that you are accessing variants through <code>case..of</code> blocks, so to catch these accesses when building. You can actually do this with:</li>
+</ul>
+<pre><code class="language-nim">switch(&quot;warning&quot;, &quot;ProveField:on&quot;)
+switch(&quot;warningAsError&quot;, &quot;ProveField:on&quot;)
+</code></pre>
+<p>But it's quite picky and it seems like it implies arc, as it requires <code>newObj</code>- to be defined.</p>
+<ul>
+<li>It also would be nice to be able to override the invalid access message creation mechanism, to avoid calling <code>appendString</code>.</li>
+<li>Currently (as I'm writing this post nim v2.2.6 just got released), panicoverride does not support the full extent of nim features, so doing anything more than blinking a LED is a bit cumbersome (I am working to try and put this into upstream).</li>
+</ul>
+<p>Anyways, if you want to use object variants, and you are very sure you're great at not writing bad code, you can disable the checks (and the need for arc) with <code>--fieldChecks:off</code>.</p>
+<p>Spoiler: I had at least 3 crashes that were caught by these safety features. Even if you are good, everyone does a bit of copy pasting, and mistakes can happen.</p>
+<h2>trying not to allocate</h2>
+<p>So, the age-old problem with embedded about not wanting to do dynamic allocations.</p>
+<p>I got two nice approaches here:</p>
+<h2><code>var array</code>s</h2>
+<p>Passing a var array (or a wrapper to it) in nim is quite nice, since you have generics, can enforce &quot;&quot;&quot;<em>ref-like</em>&quot;&quot;&quot; semantics for value types (using <code>{.byref.}</code> to enforce passing by pointer), and arrays do not decade to pointers, unlike in C. Also, I believe var parameters are always passed by pointer in the generated C code.</p>
+<p>So you can just use this approach with stack-allocated or global buffers.</p>
+<h2>non owning views into arrays</h2>
+<p>Now I had this headache for a day or two, about why I was getting sequences being generated and allocated in my sequence-less code:</p>
+<pre><code class="language-nim">let chan = cast[Channel](cmd.scd_chan)
+let mode = cast[ChannelMode](cmd.scd_chan)
+channels.incl {mode}
+
+ay.channel_on(channels)
+ay.set_amplitude(chan, 15)
+
+arpeggio_bufs[cmd.scd_chan].add_arpeggio(
+  cmd.root, oct, cmd.buf[0..cmd.size-1], cmd.dir,
+  reps
+).or_else(failed)
+</code></pre>
+<p>Turns out that slicing an array and passing said slice through an <code>openArray</code> input parameter is not free in nim.</p>
+<p>The way around it is using <a href="https://nim-lang.org/docs/system.html#toOpenArray%2Cseq%5BT%5D%2Cint%2Cint">toOpenArray</a> to generate a non-owning view through the array.</p>
+<h2>compile time tables</h2>
+<p>This is one of the small things that I love about nim, that almost anything you can use at runtime, you can also use at compile time.</p>
+<p>Lots of times, to avoid many allocations or to pre-compute stuff, you want to create arrays or tables with metadata and such.</p>
+<p>One pattern I learnt to use and love is the anonymus proc generating comptime arrays (notice that if the user adds or removes an enum entry from <code>ErrorCode</code>, this does not require refactoring):</p>
+<pre><code class="language-nim">const
+  ErrorStrings = (proc(): array[ErrorCode.high.ord + 1, string] =
+    for i in 0..ErrorCode.high.ord:
+      result[i] = symbolName(cast[ErrorCode](i))
+  )()
+</code></pre>
+<p>Clear, succint, effective.</p>
+<h2>metaprogramming</h2>
+<p>The current project I am working on is made of 3 subprojects:</p>
+<ul>
+<li>An embedded driver</li>
+<li>An embedded application</li>
+<li>A desktop cli tool to interact with the ones above</li>
+</ul>
+<p>Before that, I have worked for ~2 years on avr_io, which is mainly a series of wrappers, and easy to use set of API to interact with AVR microcontrollers.</p>
+<p>There, I used a lot of macros and templates to perform AST manipulation to e.g. generate ISR handlers easily, and to try to provide 0-overhead abstractions.</p>
+<p>Here in these projects?</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/qfk9e2rgrxdgx8bwk1je.png" alt="Image description" /></p>
+<p>Macros are incredible in nim, but they are hard to maintain and best kept in libraries. Nim is so expressive that you will rarely need them in application code anyways.</p>
+<h2>building</h2>
+<p>As I said, my current project has 3 projects in 1, with one of these being a CLI app, which means I have different config.nims and targets and such.</p>
+<h2>nimble, atlas and make</h2>
+<p>I found nimble to be very cumbersome to use in these scenarios, as config.nims and nims file in general do not seem to work properly with nested nimble projects and custom tasks.</p>
+<p>So I very sadly went back to good old <code>make</code> and a single nimble file, which works well enough for me (since I mainly work on linux/macosx). I have a single nimble file in my root directory, and different targets in the Makefile.</p>
+<p>Also, I started using atlas a bit and it was quite a positive experience.</p>
+<p>Atlas is nim's brand new &quot;package cloner&quot;. I would describe it as a really nice way to vendor dependencies and nim compiler versions, it is sort of like if <code>go mod vendor</code> from go, and <code>virtualenv</code> from python had a child.</p>
+<p>Not only that, but atlas allow you to link multiple projects together to unlock local-first workspaces. I am experimenting with it and liking it quite a bit. It works much better than nimble for my personal opinion and ergonomical preferences.</p>
+
+    </div>
+    <footer class="post-footer">
+      <div class="tags"><a href="/tags/nim/">nim</a><a href="/tags/embedded/">embedded</a><a href="/tags/languages/">languages</a></div>
+    </footer>
+  </article>
+</div>
+
+<script>
+(function() {
+  const content = document.getElementById('post-content');
+  const tocList = document.getElementById('toc-list');
+  const headings = content.querySelectorAll('h2, h3');
+
+  if (headings.length === 0) {
+    document.getElementById('post-sidebar').style.display = 'none';
+    return;
+  }
+
+  // Build TOC
+  headings.forEach((heading, index) => {
+    // Add ID to heading if missing
+    if (!heading.id) {
+      heading.id = 'section-' + index;
+    }
+
+    const li = document.createElement('li');
+    li.className = 'toc-item toc-' + heading.tagName.toLowerCase();
+
+    const a = document.createElement('a');
+    a.href = '#' + heading.id;
+    a.textContent = heading.textContent.replace(/^#+ /, '');
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      history.pushState(null, '', '#' + heading.id);
+    });
+
+    li.appendChild(a);
+    tocList.appendChild(li);
+  });
+
+  // Highlight current section on scroll
+  const tocLinks = tocList.querySelectorAll('a');
+  let ticking = false;
+
+  function updateActiveLink() {
+    const scrollPos = window.scrollY + 100;
+    let current = null;
+
+    headings.forEach((heading, index) => {
+      if (heading.offsetTop <= scrollPos) {
+        current = index;
+      }
+    });
+
+    tocLinks.forEach((link, index) => {
+      link.parentElement.classList.toggle('active', index === current);
+    });
+
+    ticking = false;
+  }
+
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      requestAnimationFrame(updateActiveLink);
+      ticking = true;
+    }
+  });
+
+  updateActiveLink();
+
+  // Add language labels to code blocks
+  document.querySelectorAll('pre code[class*="language-"]').forEach(function(code) {
+    const match = code.className.match(/language-(\w+)/);
+    if (match) {
+      code.parentElement.setAttribute('data-lang', match[1]);
+    }
+  });
+})();
+</script>
+
+  </main>
+  <footer>
+    <p>&copy; G. Marcello</p>
+  </footer>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/nim.min.js"></script>
+  <script>
+    hljs.registerAliases('nims', { languageName: 'nim' });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>

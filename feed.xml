@@ -1,0 +1,447 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+  <title>mar@antima</title>
+  <link>https://example.com</link>
+  <description>A blog about things</description>
+  <item>
+    <title>more nim for embedded software development</title>
+    <link>https://example.com/posts/more-nim-for-embedded-software-development/</link>
+    <pubDate>11/01/2026</pubDate>
+    <description><![CDATA[<p>Writing libraries is fun, but at some point you've got to use them. I've been writing one for roughly two years!</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/o4o0o2kz1f54qa6n0vew.png" alt="2 years" /></p>
+<p>Finally, I moved to writing a not-so-small project using said library (<code>avr_io</code> - <a href="https://github.com/Abathargh/avr_io">avr_io@github</a>), so it is with this newfound knowledge that I bring forth some thoughts about my freshly started nim-application-dev days.</p>
+<p>This is a loose sequel of a previous article, <a href="https://dev.to/abathargh/nim-for-embedded-software-development-33cc">nim for embedded software development</a>.</p>
+<p>Note: the following is <em>mainly</em> about bare-metal firmware for 8-bit microcontrollers, but it can be applied to other domains.</p>
+<h2>arc memory management</h2>
+<p>I have been experimenting a bit with arc and I like the &quot;don't pay for what you don't use&quot; kind of thing.</p>
+<p>Essentially, if you're not using <code>ref</code>-types you don't really notice arc, and you can use <code>string</code> and <code>seq</code> for relatively low cost in binary size.</p>
+<p>Still haven't experimented too much with size differences to have a precise measurement, but it's not too bad if you don't over-use allocations or some portions of the stdlib.</p>
+<p>If that does become bad, I have the following incantation that sequeezes quite a bit of KB from your binary:</p>
+<pre><code class="language-nims">switch(&quot;gc&quot;, &quot;none&quot;)
+switch(&quot;opt&quot;, &quot;size&quot;)
+switch(&quot;define&quot;, &quot;danger&quot;)
+</code></pre>
+<p>It also has been suggested to me to use <code>--execptions:quirky</code>, but in all honesty I don't use exceptions a lot.</p>
+<p>You have to be careful and really know what you're doing tho, with these flags. And some portions of the language may not work, like..</p>
+<h2>object variants</h2>
+<p>One thing were arc (or a mm ≠ none) may be needed is if you're using object variants.</p>
+<p>I was kind of surprised by this! Aren't they basically just safer tagged <code>union</code>s from C?</p>
+<pre><code class="language-nim">## An example of an object variant in use
+type
+  CmdKind* = enum
+    SetBpm
+    SetValue
+    SetAmplitude
+    SetEnvelope
+
+  Command* = object
+    case kind*: CmdKind
+    of SetBpm:
+      bpm*:       uint16
+    of SetValue:
+      value*:     NoteValue
+    of SetAmplitude:
+      amp_chan*:  uint8
+      amplitude*: uint8
+    of SetEnvelope:
+      envelope*:  EnvelopeShape
+      frequency*: uint16
+</code></pre>
+<p>The keyword here is <em>safer</em>; nim achieves this by:</p>
+<ul>
+<li>Forcing you to re-create the object instead of just switching the tag and possibly invalidate the underlying data.</li>
+<li>Raising an exception/panic whenever you access a field that is not tied to the active kind.</li>
+</ul>
+<p>This second bit is quite nice, because it allows you to catch runtime errors with custom panicoverride handles; for example, I just set up a blinking LED for this kind of stuff, so I have a visual cue that something went wrong.</p>
+<p>On the other side, the message passed to the panic handle is built with <code>appendString</code>, which implies at least using <code>-mm:arc --define:useMalloc</code>, so if you want to use object variants AND be safe about them, you cannot go with just <code>--mm:none</code>.</p>
+<p>I got three issues with this:</p>
+<ul>
+<li>It would be nice to maybe have a compiler flag that enforces compile-time checking that you are accessing variants through <code>case..of</code> blocks, so to catch these accesses when building. You can actually do this with:</li>
+</ul>
+<pre><code class="language-nim">switch(&quot;warning&quot;, &quot;ProveField:on&quot;)
+switch(&quot;warningAsError&quot;, &quot;ProveField:on&quot;)
+</code></pre>
+<p>But it's quite picky and it seems like it implies arc, as it requires <code>newObj</code>- to be defined.</p>
+<ul>
+<li>It also would be nice to be able to override the invalid access message creation mechanism, to avoid calling <code>appendString</code>.</li>
+<li>Currently (as I'm writing this post nim v2.2.6 just got released), panicoverride does not support the full extent of nim features, so doing anything more than blinking a LED is a bit cumbersome (I am working to try and put this into upstream).</li>
+</ul>
+<p>Anyways, if you want to use object variants, and you are very sure you're great at not writing bad code, you can disable the checks (and the need for arc) with <code>--fieldChecks:off</code>.</p>
+<p>Spoiler: I had at least 3 crashes that were caught by these safety features. Even if you are good, everyone does a bit of copy pasting, and mistakes can happen.</p>
+<h2>trying not to allocate</h2>
+<p>So, the age-old problem with embedded about not wanting to do dynamic allocations.</p>
+<p>I got two nice approaches here:</p>
+<h2><code>var array</code>s</h2>
+<p>Passing a var array (or a wrapper to it) in nim is quite nice, since you have generics, can enforce &quot;&quot;&quot;<em>ref-like</em>&quot;&quot;&quot; semantics for value types (using <code>{.byref.}</code> to enforce passing by pointer), and arrays do not decade to pointers, unlike in C. Also, I believe var parameters are always passed by pointer in the generated C code.</p>
+<p>So you can just use this approach with stack-allocated or global buffers.</p>
+<h2>non owning views into arrays</h2>
+<p>Now I had this headache for a day or two, about why I was getting sequences being generated and allocated in my sequence-less code:</p>
+<pre><code class="language-nim">let chan = cast[Channel](cmd.scd_chan)
+let mode = cast[ChannelMode](cmd.scd_chan)
+channels.incl {mode}
+
+ay.channel_on(channels)
+ay.set_amplitude(chan, 15)
+
+arpeggio_bufs[cmd.scd_chan].add_arpeggio(
+  cmd.root, oct, cmd.buf[0..cmd.size-1], cmd.dir,
+  reps
+).or_else(failed)
+</code></pre>
+<p>Turns out that slicing an array and passing said slice through an <code>openArray</code> input parameter is not free in nim.</p>
+<p>The way around it is using <a href="https://nim-lang.org/docs/system.html#toOpenArray%2Cseq%5BT%5D%2Cint%2Cint">toOpenArray</a> to generate a non-owning view through the array.</p>
+<h2>compile time tables</h2>
+<p>This is one of the small things that I love about nim, that almost anything you can use at runtime, you can also use at compile time.</p>
+<p>Lots of times, to avoid many allocations or to pre-compute stuff, you want to create arrays or tables with metadata and such.</p>
+<p>One pattern I learnt to use and love is the anonymus proc generating comptime arrays (notice that if the user adds or removes an enum entry from <code>ErrorCode</code>, this does not require refactoring):</p>
+<pre><code class="language-nim">const
+  ErrorStrings = (proc(): array[ErrorCode.high.ord + 1, string] =
+    for i in 0..ErrorCode.high.ord:
+      result[i] = symbolName(cast[ErrorCode](i))
+  )()
+</code></pre>
+<p>Clear, succint, effective.</p>
+<h2>metaprogramming</h2>
+<p>The current project I am working on is made of 3 subprojects:</p>
+<ul>
+<li>An embedded driver</li>
+<li>An embedded application</li>
+<li>A desktop cli tool to interact with the ones above</li>
+</ul>
+<p>Before that, I have worked for ~2 years on avr_io, which is mainly a series of wrappers, and easy to use set of API to interact with AVR microcontrollers.</p>
+<p>There, I used a lot of macros and templates to perform AST manipulation to e.g. generate ISR handlers easily, and to try to provide 0-overhead abstractions.</p>
+<p>Here in these projects?</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/qfk9e2rgrxdgx8bwk1je.png" alt="Image description" /></p>
+<p>Macros are incredible in nim, but they are hard to maintain and best kept in libraries. Nim is so expressive that you will rarely need them in application code anyways.</p>
+<h2>building</h2>
+<p>As I said, my current project has 3 projects in 1, with one of these being a CLI app, which means I have different config.nims and targets and such.</p>
+<h2>nimble, atlas and make</h2>
+<p>I found nimble to be very cumbersome to use in these scenarios, as config.nims and nims file in general do not seem to work properly with nested nimble projects and custom tasks.</p>
+<p>So I very sadly went back to good old <code>make</code> and a single nimble file, which works well enough for me (since I mainly work on linux/macosx). I have a single nimble file in my root directory, and different targets in the Makefile.</p>
+<p>Also, I started using atlas a bit and it was quite a positive experience.</p>
+<p>Atlas is nim's brand new &quot;package cloner&quot;. I would describe it as a really nice way to vendor dependencies and nim compiler versions, it is sort of like if <code>go mod vendor</code> from go, and <code>virtualenv</code> from python had a child.</p>
+<p>Not only that, but atlas allow you to link multiple projects together to unlock local-first workspaces. I am experimenting with it and liking it quite a bit. It works much better than nimble for my personal opinion and ergonomical preferences.</p>
+]]></description>
+  </item>
+  <item>
+    <title>optimizing c structs layouts</title>
+    <link>https://example.com/posts/optimizing-c-structs-layouts/</link>
+    <pubDate>07/12/2024</pubDate>
+    <description><![CDATA[<p>Let's consider a simple c struct:</p>
+<pre><code class="language-c">struct foo {
+    const char * str;
+    unsigned char flag;
+    uint64_t len;
+};
+</code></pre>
+<p>Suppose that this code is being run as a part of a program executing on a 64-bit machine: what would you expect the result of <code>sizeof(struct foo)</code> to be?</p>
+<p>Most people that never had to mess with struct sizes and optimizations would guess that it should be 17...</p>
+<p>... but <em>it's 24</em>! Why is that?</p>
+<p>The reason for this behavior is that compilers optimize struct layouts for speed, and it's the modern norm that aligned memory accesses are the fastest way to access data.</p>
+<p>This means that, depending on the type of field and cpu, your data will have some alignment and will be positioned such that that alignment is respected (or, such that <code>field-address % field-alignment == 0</code>).</p>
+<h2>size, alignment, padding</h2>
+<p>In the case of the previous example, pointers and 64-bit fields are 8B aligned on 64-bit machines, and this means that, in order to force a layout where everything in the struct is aligned, the compiler will generate some padding between the <code>flag</code> and <code>len</code> fields:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ld02w85wugogllfgaf84.png" alt="Image description" /></p>
+<p>Now let's consider another example, where a struct like this is defined, on the same machine as before:</p>
+<pre><code class="language-c">struct bar {
+    const char * str;
+    short s1;
+    int i1;
+    short s2;
+    int i2;
+};
+</code></pre>
+<p>How do we go about computing its size?</p>
+<p>There are three rules:</p>
+<ul>
+<li>Struct fields want to be aligned with their own natural alignment.</li>
+<li>The overall struct alignment is equal to the alignment of its widest field</li>
+<li>If you had to put two structs of the same type side by side, the second one should be aligned to its alignment -- this means that structs must have trailing padding up to their alignment</li>
+</ul>
+<p>Quick recap on basic types alignment and size for 64-bit machines:</p>
+<table>
+<thead>
+<tr>
+<th>type</th>
+<th>size</th>
+<th>alignment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>char</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>short</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td>int</td>
+<td>4</td>
+<td>4</td>
+</tr>
+<tr>
+<td>long</td>
+<td>8</td>
+<td>8</td>
+</tr>
+<tr>
+<td>float</td>
+<td>4</td>
+<td>4</td>
+</tr>
+<tr>
+<td>double</td>
+<td>8</td>
+<td>8</td>
+</tr>
+<tr>
+<td>pointers</td>
+<td>8</td>
+<td>8</td>
+</tr></tbody></table>
+<p>Also remember that:</p>
+<ul>
+<li>Arrays have the alignment of their value type, and size that is <code>sizeof(type) * elements number</code>.</li>
+<li>Unions have the alignment and size of their widest member.</li>
+</ul>
+<p>And you can use the super useful <code>sizeof</code> and <code>_Alignof</code> operators to get this information for your custom types. Note that <code>_Alignof</code> is available from C11 onward, and is called <code>alignof</code> starting with C23. It was always <code>alignof</code> from what I understand in C++, since C++11.</p>
+<p>For more information, the bible on this topic is <a href="http://www.catb.org/esr/structure-packing/">The Lost Art of Structure Packing</a>, from which I learned almost everything I know about this, together with a lot of practice and hands-on experience.</p>
+<h2>optimizing your structs: stropt</h2>
+<p>This topic here is something that comes up rather frequently at work, where saving bytes here and there is super important when sending huge loads of data continuously in queues and whatnot.</p>
+<p>In order to make my life easier, I wrote a tool that produces some statistics on a type you pass as input, with reference to a source file or code snippet, it's called <strong><em>stropt</em></strong> (struct optimizer).</p>
+<p><a href="https://github.com/Abathargh/stropt">Abathargh/stropt on GitHub</a></p>
+<h3>build &amp; install</h3>
+<p>If you have a local go installation you can go right ahead and build or install the application directly:</p>
+<pre><code class="language-bash">git clone https://github.com/Abathargh/stropt
+go build
+
+// or, if you want to install this directly
+go install github.com/Abathargh/stropt
+</code></pre>
+<p>Already compiled binaries for a list of os/archs combinations are also provided in the github release page:</p>
+<p><a href="https://github.com/Abathargh/stropt/releases">stropt binaries</a></p>
+<h3>using the tool</h3>
+<p>You can either use stropt by passing the source to analyze as a string:</p>
+<pre><code class="language-bash">stropt &quot;struct meta&quot; &quot;struct meta { int a; double d; float f[100];};&quot;
+</code></pre>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/o1x7twrzzt2t5wh6qjgr.png" alt="Image description" /></p>
+<p>Or you can pass a file in which the definition is contained:</p>
+<pre><code class="language-c">// test.c
+struct test {
+  const char * str;
+  unsigned char flag;
+  const int * const iptr;
+  char c;
+};
+</code></pre>
+<pre><code class="language-bash">stropt -file test.c &quot;struct test&quot;
+</code></pre>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/72m21ya0e4ongmvoi6h2.png" alt="Image description" /></p>
+<p>The tool can also provide a possible optimization for your types by using the <code>-optimize</code> flag, and it's aware of fields that are structs themselves:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/7v6780lcwtfwsg0jrjmo.png" alt="Image description" /></p>
+<p>Note that the <code>verbose</code> flag is used to show inner structs (and unions) along with their fields alignment and size.</p>
+<h2>what's next</h2>
+<p>This tool was written in go using the great <code>modernc.org/cc</code> C compiler front-end for parsing C code, and <code>lipgloss</code> from charmbracelet for the UI.</p>
+<p>I'm writing this for myself but I'm happy to share it publicly; I'd like to make this a webapp for easier use directly in a browser, so probably that's the next thing I'm going to be working on!</p>
+]]></description>
+  </item>
+  <item>
+    <title>nim for embedded software development</title>
+    <link>https://example.com/posts/nim-for-embedded-software-development/</link>
+    <pubDate>28/03/2024</pubDate>
+    <description><![CDATA[<p>While we in embedded-land are mostly working with either C or C++ on our professional ventures, often with proprietary tooling and whatnot, I always find some much appreciated respite in tinkering with other alternatives when wasting time on hobbies and side-projects.</p>
+<p>In the last year or so, I delved into exploring other venues to solve my embedded headaches and landed onto the <code>nim programming language</code>.</p>
+<h3>nim compiles to c (and c++, objective-c, js)</h3>
+<p>This means that any target with an existing c compiler is automatically supported by nim.</p>
+<p>Not only that, but calling c code (and c++, objective-c, etc.) is really simple to do and, from what I see, 0-overhead.</p>
+<p>You can also easily check the generated C sources, which are human readable, even if with a lot of noise. This can be achieved by specifying a <code>--nimcache</code> directory when compiling.</p>
+<h3>writing, building, shipping</h3>
+<p>Like all modern stuff, we have a sane module system (bye bye text-based <code>#include</code>s), an ergonomic compiler and a nice, basic package manager.</p>
+<p>The compiler lets you use a script-like subset of the language as a format for configuration files. These may contain compiler switches and system-specific flags. It integrates seamlessly with the <code>nimble</code> package manager, which lets you write tasks that can be executed both after building or as sorts of standalone targets.</p>
+<h3>writing a simple hello world for AVR is trivial (ish)</h3>
+<p>This is a valid program that can be run on a x64 intel CPU and, without any changes, on an 8-bit atmega microcontroller:</p>
+<pre><code class="language-nim">proc main =
+  while true:
+    discard
+
+main()
+</code></pre>
+<p>To compile on AVR, you just have to provide some more configuration on how to handle critical errors without the os covering our backs:</p>
+<pre><code class="language-nim"># panicoverride.nim
+
+proc exit(code: int) {.importc, header: &quot;&lt;stdlib.h&gt;&quot;, cdecl.}
+
+{.push stack_trace: off, profiler:off.}
+
+proc rawoutput(s: string) = discard
+
+proc panic(s: string) =
+  rawoutput(s)
+  while true:
+    discard
+  exit(1)
+
+{.pop.}
+</code></pre>
+<p>And a couple of compiler flags:</p>
+<pre><code class="language-nim"># config.nims
+
+switch(&quot;os&quot;, &quot;standalone&quot;)
+switch(&quot;cpu&quot;, &quot;avr&quot;)
+switch(&quot;gc&quot;, &quot;none&quot;)
+switch(&quot;stackTrace&quot;, &quot;off&quot;)
+switch(&quot;lineTrace&quot;, &quot;off&quot;)
+switch(&quot;passC&quot;, &quot;-mmcu=atmega328p&quot;)
+switch(&quot;passL&quot;, &quot;-mmcu=atmega328p&quot;)
+switch(&quot;nimcache&quot;, &quot;.nimcache&quot;)
+
+switch(&quot;avr.standalone.gcc.options.linker&quot;, &quot;-static&quot;)
+switch(&quot;avr.standalone.gcc.exe&quot;, &quot;avr-gcc&quot;)
+switch(&quot;avr.standalone.gcc.linkerexe&quot;, &quot;avr-gcc&quot;)
+
+when defined(windows):
+  switch(&quot;gcc.options.always&quot;, &quot;-w -fmax-errors=3&quot;)
+</code></pre>
+<p>Notice that these is where you specify which c compiler to use, to then actually generate the final binaries.</p>
+<p>The compiler is identified by the <code>cpu.os.compiler</code> name (<code>avr.standalone.gcc</code>):</p>
+<ul>
+<li>The compiler executable is specified through the <code>exe</code> property.</li>
+<li>The linker executable is specified through the <code>linkerexe</code> property.</li>
+</ul>
+<p>Let's dump these code snippets into the following files:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/rdgn5ujrpkh3flykt183.png" alt="output of ls -alh" /></p>
+<p>Run the compiler...</p>
+<pre><code class="language-bash">nim c avr_hw.nim
+</code></pre>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/gi8399k90eixx3hdvsio.png" alt="output of nim c" /></p>
+<p>...and check its output</p>
+<pre><code>avr_hw:     file format elf32-avr
+
+
+Disassembly of section .text:
+
+00000000 &lt;.text&gt;:
+   0:	0c 94 38 00 	jmp	0x70
+   4:	0c 94 4a 00 	jmp	0x94
+   8:	0c 94 4a 00 	jmp	0x94
+  ...
+  70:	11 24       	eor	r1, r1
+  72:	1f be       	out	0x3f, r1
+  74:	cf ef       	ldi	r28, 0xFF
+  76:	d0 e1       	ldi	r29, 0x10
+  78:	de bf       	out	0x3e, r29
+  7a:	cd bf       	out	0x3d, r28
+  7c:	21 e0       	ldi	r18, 0x01
+  7e:	a0 e0       	ldi	r26, 0x00
+  80:	b1 e0       	ldi	r27, 0x01
+  82:	01 c0       	rjmp	.+2
+  84:	1d 92       	st	X+, r1
+  86:	ae 30       	cpi	r26, 0x0E
+  88:	b2 07       	cpc	r27, r18
+  8a:	e1 f7       	brne	.-8
+  8c:	0e 94 52 00 	call	0xa4
+  90:	0c 94 53 00 	jmp	0xa6
+  94:	0c 94 00 00 	jmp	0
+  98:	ff cf       	rjmp	.-2
+  9a:	08 95       	ret
+  9c:	08 95       	ret
+  9e:	ff cf       	rjmp	.-2
+  a0:	ff cf       	rjmp	.-2
+  a2:	ff cf       	rjmp	.-2
+  a4:	ff cf       	rjmp	.-2
+  a6:	f8 94       	cli
+  a8:	ff cf       	rjmp	.-2
+</code></pre>
+<p>Worked like a charm!</p>
+<h3>foreign function interface</h3>
+<p>Want to use <code>_delay_ms</code> from <code>util/delay.h</code>?</p>
+<pre><code class="language-nim">proc delay_ms(us: uint16) {.importc: &quot;_delay_ms&quot;, header: &quot;util/delay.h&quot;.}
+
+proc main =
+  while true:
+    delay_ms(1000)
+
+main()
+</code></pre>
+<p>As shown, it's really easy to integrate existing c code in your programs, you don't have to rewrite everything in nim. Note that there are tools to also translate c code to nim (c2nim, futhark).</p>
+<h3>metaprogramming</h3>
+<p>Metaprogramming is nim killer-feature in my opinion.</p>
+<p>nim has:</p>
+<ul>
+<li>Compile-time functions, which get executed in a VM embedded within the compiler, and supports a subset of the language to be evaluated at compile time.</li>
+</ul>
+<pre><code class="language-nim">const data = staticRead(&quot;my_file&quot;) # the file gets read at compile time!
+</code></pre>
+<ul>
+<li>Generics and concepts, which from what I observed, are completely 0 cost at runtime, and are really only present in nim code, not in the c-generated one. Using them in combination with typeclasses enables quite powerful patterns.</li>
+</ul>
+<pre><code class="language-nim">type MappedIoRegister*[T: uint8|uint16] = distinct uint16 ## \
+  ## A register that can either contain a byte-sized or word-sized datum.
+
+template ioPtr[T](a: MappedIoRegister[T]): ptr T =
+  cast[ptr T](a)
+</code></pre>
+<ul>
+<li>Templates, which are hygienic (with scoped symbols) c macros, essentially a replace-mechanism that allows you to have &quot;true inlining&quot;. Combining this with operator overloading is really nice.</li>
+</ul>
+<pre><code class="language-nim">import volatile
+
+template `[]`*[T](p: MappedIoRegister[T]): T =
+  volatile.volatileLoad(ioPtr[T](p))
+
+template `[]=`*[T](p: MappedIoRegister[T]; v: T) =
+  volatile.volatileStore(ioPtr[T](p), v)
+</code></pre>
+<ul>
+<li>Macros, which are special functions taking in Abstract Syntax Tree (AST) representations of nim code and spewing out ASTs that are transformations of its inputs. This allows for some pretty crazy stuff.</li>
+</ul>
+<pre><code class="language-nim"># VectorInterrupt enum definition omitted..
+template vectorDecl(n: int): string =
+  &quot;$1  __vector_&quot; &amp; $n &amp;
+  &quot;&quot;&quot;
+    $3 __attribute__((__signal__,__used__,__externally_visible__));
+    $1 __vector_&quot;&quot;&quot; &amp; $n &amp; &quot;$3&quot;
+
+
+macro isr*(v: static[VectorInterrupt], p: untyped): untyped =
+  ## Turns the passed procedure `p` into an interrupt
+  ## service routine.
+  var pnode = p
+  if p.kind == nnkStmtList:
+    pnode = p[0]
+
+  expectKind(pnode, nnkProcDef)
+
+  addPragma(pnode, newIdentNode(&quot;exportc&quot;))
+  addPragma(pnode,
+    newNimNode(nnkExprColonExpr).add(
+      newIdentNode(&quot;codegenDecl&quot;),
+      newLit(vectorDecl(ord(v)))
+    )
+  )
+  pnode
+
+# Now we can map functions to an interrupt
+
+proc timer0_compa_isr() {.isr(Timer0CompAVect).} =
+  # do stuff when the timer0 compare A interrupt gets triggered
+  discard
+</code></pre>
+<p>All code snippets are taken from the <a href="https://github.com/Abathargh/avr_io">avr_io</a> library, a small project that I maintain.</p>
+<p>Note that we can use <code>exportc</code> to generate code that will interact with c, and <code>codegenDecl</code> to manipulate the c-generated code: this is incredibly powerful, especially for writing libraries.</p>
+<p>As a rule of thumb, use these features in this order and go to the next one only if needed: <code>non-meta stuff -&gt; generics -&gt; templates -&gt; macros</code>.</p>
+<h3>memory management</h3>
+<p>Memory management is highly configurable in nim.</p>
+<p>Starting from v2 onward, the memory management policy used by default is based on a reference counting approach, that also handles cycles (<code>-mm:orc</code>).</p>
+<p>You can also choose to use a more easy-to-reason strategy, which also uses reference counting but without support for cycles (<code>-mm:arc</code>). Notice that both are deterministic and not stop-the-world.</p>
+<p>By experimenting, I noticed that binary size can become a bit larger with orc/arc, so if it is really a problem, you can always opt in not managing your memory at all (<code>-mm:none</code>).</p>
+<p>Why does that matter? Because nim has managed types, but I did not experiment with them enough to have formed an opinion on how good or not they are in bare-metal situations!</p>
+]]></description>
+  </item>
+</channel>
+</rss>

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>nim for embedded software development</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <link rel="alternate" type="application/rss+xml" title="mar@antima" href="/feed.xml">
+  <link rel="icon" type="image/png" href="/images/antima_icon.png">
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <a href="/" class="site-title">mar@antima</a>
+      <nav class="nav-links">
+        <a href="/about/">about</a>
+        <a href="/feed.xml">rss</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="post-layout">
+  <aside class="post-sidebar" id="post-sidebar">
+    <nav class="toc">
+      <div class="toc-header">On this page</div>
+      <ul class="toc-list" id="toc-list"></ul>
+    </nav>
+  </aside>
+  <article class="post">
+    <header>
+      <h1>nim for embedded software development</h1>
+      <time>28/03/2024</time>
+    </header>
+    <div class="content" id="post-content">
+      <p>While we in embedded-land are mostly working with either C or C++ on our professional ventures, often with proprietary tooling and whatnot, I always find some much appreciated respite in tinkering with other alternatives when wasting time on hobbies and side-projects.</p>
+<p>In the last year or so, I delved into exploring other venues to solve my embedded headaches and landed onto the <code>nim programming language</code>.</p>
+<h3>nim compiles to c (and c++, objective-c, js)</h3>
+<p>This means that any target with an existing c compiler is automatically supported by nim.</p>
+<p>Not only that, but calling c code (and c++, objective-c, etc.) is really simple to do and, from what I see, 0-overhead.</p>
+<p>You can also easily check the generated C sources, which are human readable, even if with a lot of noise. This can be achieved by specifying a <code>--nimcache</code> directory when compiling.</p>
+<h3>writing, building, shipping</h3>
+<p>Like all modern stuff, we have a sane module system (bye bye text-based <code>#include</code>s), an ergonomic compiler and a nice, basic package manager.</p>
+<p>The compiler lets you use a script-like subset of the language as a format for configuration files. These may contain compiler switches and system-specific flags. It integrates seamlessly with the <code>nimble</code> package manager, which lets you write tasks that can be executed both after building or as sorts of standalone targets.</p>
+<h3>writing a simple hello world for AVR is trivial (ish)</h3>
+<p>This is a valid program that can be run on a x64 intel CPU and, without any changes, on an 8-bit atmega microcontroller:</p>
+<pre><code class="language-nim">proc main =
+  while true:
+    discard
+
+main()
+</code></pre>
+<p>To compile on AVR, you just have to provide some more configuration on how to handle critical errors without the os covering our backs:</p>
+<pre><code class="language-nim"># panicoverride.nim
+
+proc exit(code: int) {.importc, header: &quot;&lt;stdlib.h&gt;&quot;, cdecl.}
+
+{.push stack_trace: off, profiler:off.}
+
+proc rawoutput(s: string) = discard
+
+proc panic(s: string) =
+  rawoutput(s)
+  while true:
+    discard
+  exit(1)
+
+{.pop.}
+</code></pre>
+<p>And a couple of compiler flags:</p>
+<pre><code class="language-nim"># config.nims
+
+switch(&quot;os&quot;, &quot;standalone&quot;)
+switch(&quot;cpu&quot;, &quot;avr&quot;)
+switch(&quot;gc&quot;, &quot;none&quot;)
+switch(&quot;stackTrace&quot;, &quot;off&quot;)
+switch(&quot;lineTrace&quot;, &quot;off&quot;)
+switch(&quot;passC&quot;, &quot;-mmcu=atmega328p&quot;)
+switch(&quot;passL&quot;, &quot;-mmcu=atmega328p&quot;)
+switch(&quot;nimcache&quot;, &quot;.nimcache&quot;)
+
+switch(&quot;avr.standalone.gcc.options.linker&quot;, &quot;-static&quot;)
+switch(&quot;avr.standalone.gcc.exe&quot;, &quot;avr-gcc&quot;)
+switch(&quot;avr.standalone.gcc.linkerexe&quot;, &quot;avr-gcc&quot;)
+
+when defined(windows):
+  switch(&quot;gcc.options.always&quot;, &quot;-w -fmax-errors=3&quot;)
+</code></pre>
+<p>Notice that these is where you specify which c compiler to use, to then actually generate the final binaries.</p>
+<p>The compiler is identified by the <code>cpu.os.compiler</code> name (<code>avr.standalone.gcc</code>):</p>
+<ul>
+<li>The compiler executable is specified through the <code>exe</code> property.</li>
+<li>The linker executable is specified through the <code>linkerexe</code> property.</li>
+</ul>
+<p>Let's dump these code snippets into the following files:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/rdgn5ujrpkh3flykt183.png" alt="output of ls -alh" /></p>
+<p>Run the compiler...</p>
+<pre><code class="language-bash">nim c avr_hw.nim
+</code></pre>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/gi8399k90eixx3hdvsio.png" alt="output of nim c" /></p>
+<p>...and check its output</p>
+<pre><code>avr_hw:     file format elf32-avr
+
+
+Disassembly of section .text:
+
+00000000 &lt;.text&gt;:
+   0:	0c 94 38 00 	jmp	0x70
+   4:	0c 94 4a 00 	jmp	0x94
+   8:	0c 94 4a 00 	jmp	0x94
+  ...
+  70:	11 24       	eor	r1, r1
+  72:	1f be       	out	0x3f, r1
+  74:	cf ef       	ldi	r28, 0xFF
+  76:	d0 e1       	ldi	r29, 0x10
+  78:	de bf       	out	0x3e, r29
+  7a:	cd bf       	out	0x3d, r28
+  7c:	21 e0       	ldi	r18, 0x01
+  7e:	a0 e0       	ldi	r26, 0x00
+  80:	b1 e0       	ldi	r27, 0x01
+  82:	01 c0       	rjmp	.+2
+  84:	1d 92       	st	X+, r1
+  86:	ae 30       	cpi	r26, 0x0E
+  88:	b2 07       	cpc	r27, r18
+  8a:	e1 f7       	brne	.-8
+  8c:	0e 94 52 00 	call	0xa4
+  90:	0c 94 53 00 	jmp	0xa6
+  94:	0c 94 00 00 	jmp	0
+  98:	ff cf       	rjmp	.-2
+  9a:	08 95       	ret
+  9c:	08 95       	ret
+  9e:	ff cf       	rjmp	.-2
+  a0:	ff cf       	rjmp	.-2
+  a2:	ff cf       	rjmp	.-2
+  a4:	ff cf       	rjmp	.-2
+  a6:	f8 94       	cli
+  a8:	ff cf       	rjmp	.-2
+</code></pre>
+<p>Worked like a charm!</p>
+<h3>foreign function interface</h3>
+<p>Want to use <code>_delay_ms</code> from <code>util/delay.h</code>?</p>
+<pre><code class="language-nim">proc delay_ms(us: uint16) {.importc: &quot;_delay_ms&quot;, header: &quot;util/delay.h&quot;.}
+
+proc main =
+  while true:
+    delay_ms(1000)
+
+main()
+</code></pre>
+<p>As shown, it's really easy to integrate existing c code in your programs, you don't have to rewrite everything in nim. Note that there are tools to also translate c code to nim (c2nim, futhark).</p>
+<h3>metaprogramming</h3>
+<p>Metaprogramming is nim killer-feature in my opinion.</p>
+<p>nim has:</p>
+<ul>
+<li>Compile-time functions, which get executed in a VM embedded within the compiler, and supports a subset of the language to be evaluated at compile time.</li>
+</ul>
+<pre><code class="language-nim">const data = staticRead(&quot;my_file&quot;) # the file gets read at compile time!
+</code></pre>
+<ul>
+<li>Generics and concepts, which from what I observed, are completely 0 cost at runtime, and are really only present in nim code, not in the c-generated one. Using them in combination with typeclasses enables quite powerful patterns.</li>
+</ul>
+<pre><code class="language-nim">type MappedIoRegister*[T: uint8|uint16] = distinct uint16 ## \
+  ## A register that can either contain a byte-sized or word-sized datum.
+
+template ioPtr[T](a: MappedIoRegister[T]): ptr T =
+  cast[ptr T](a)
+</code></pre>
+<ul>
+<li>Templates, which are hygienic (with scoped symbols) c macros, essentially a replace-mechanism that allows you to have &quot;true inlining&quot;. Combining this with operator overloading is really nice.</li>
+</ul>
+<pre><code class="language-nim">import volatile
+
+template `[]`*[T](p: MappedIoRegister[T]): T =
+  volatile.volatileLoad(ioPtr[T](p))
+
+template `[]=`*[T](p: MappedIoRegister[T]; v: T) =
+  volatile.volatileStore(ioPtr[T](p), v)
+</code></pre>
+<ul>
+<li>Macros, which are special functions taking in Abstract Syntax Tree (AST) representations of nim code and spewing out ASTs that are transformations of its inputs. This allows for some pretty crazy stuff.</li>
+</ul>
+<pre><code class="language-nim"># VectorInterrupt enum definition omitted..
+template vectorDecl(n: int): string =
+  &quot;$1  __vector_&quot; &amp; $n &amp;
+  &quot;&quot;&quot;
+    $3 __attribute__((__signal__,__used__,__externally_visible__));
+    $1 __vector_&quot;&quot;&quot; &amp; $n &amp; &quot;$3&quot;
+
+
+macro isr*(v: static[VectorInterrupt], p: untyped): untyped =
+  ## Turns the passed procedure `p` into an interrupt
+  ## service routine.
+  var pnode = p
+  if p.kind == nnkStmtList:
+    pnode = p[0]
+
+  expectKind(pnode, nnkProcDef)
+
+  addPragma(pnode, newIdentNode(&quot;exportc&quot;))
+  addPragma(pnode,
+    newNimNode(nnkExprColonExpr).add(
+      newIdentNode(&quot;codegenDecl&quot;),
+      newLit(vectorDecl(ord(v)))
+    )
+  )
+  pnode
+
+# Now we can map functions to an interrupt
+
+proc timer0_compa_isr() {.isr(Timer0CompAVect).} =
+  # do stuff when the timer0 compare A interrupt gets triggered
+  discard
+</code></pre>
+<p>All code snippets are taken from the <a href="https://github.com/Abathargh/avr_io">avr_io</a> library, a small project that I maintain.</p>
+<p>Note that we can use <code>exportc</code> to generate code that will interact with c, and <code>codegenDecl</code> to manipulate the c-generated code: this is incredibly powerful, especially for writing libraries.</p>
+<p>As a rule of thumb, use these features in this order and go to the next one only if needed: <code>non-meta stuff -&gt; generics -&gt; templates -&gt; macros</code>.</p>
+<h3>memory management</h3>
+<p>Memory management is highly configurable in nim.</p>
+<p>Starting from v2 onward, the memory management policy used by default is based on a reference counting approach, that also handles cycles (<code>-mm:orc</code>).</p>
+<p>You can also choose to use a more easy-to-reason strategy, which also uses reference counting but without support for cycles (<code>-mm:arc</code>). Notice that both are deterministic and not stop-the-world.</p>
+<p>By experimenting, I noticed that binary size can become a bit larger with orc/arc, so if it is really a problem, you can always opt in not managing your memory at all (<code>-mm:none</code>).</p>
+<p>Why does that matter? Because nim has managed types, but I did not experiment with them enough to have formed an opinion on how good or not they are in bare-metal situations!</p>
+
+    </div>
+    <footer class="post-footer">
+      <div class="tags"><a href="/tags/nim/">nim</a><a href="/tags/embedded/">embedded</a><a href="/tags/metaprogramming/">metaprogramming</a><a href="/tags/languages/">languages</a></div>
+    </footer>
+  </article>
+</div>
+
+<script>
+(function() {
+  const content = document.getElementById('post-content');
+  const tocList = document.getElementById('toc-list');
+  const headings = content.querySelectorAll('h2, h3');
+
+  if (headings.length === 0) {
+    document.getElementById('post-sidebar').style.display = 'none';
+    return;
+  }
+
+  // Build TOC
+  headings.forEach((heading, index) => {
+    // Add ID to heading if missing
+    if (!heading.id) {
+      heading.id = 'section-' + index;
+    }
+
+    const li = document.createElement('li');
+    li.className = 'toc-item toc-' + heading.tagName.toLowerCase();
+
+    const a = document.createElement('a');
+    a.href = '#' + heading.id;
+    a.textContent = heading.textContent.replace(/^#+ /, '');
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      history.pushState(null, '', '#' + heading.id);
+    });
+
+    li.appendChild(a);
+    tocList.appendChild(li);
+  });
+
+  // Highlight current section on scroll
+  const tocLinks = tocList.querySelectorAll('a');
+  let ticking = false;
+
+  function updateActiveLink() {
+    const scrollPos = window.scrollY + 100;
+    let current = null;
+
+    headings.forEach((heading, index) => {
+      if (heading.offsetTop <= scrollPos) {
+        current = index;
+      }
+    });
+
+    tocLinks.forEach((link, index) => {
+      link.parentElement.classList.toggle('active', index === current);
+    });
+
+    ticking = false;
+  }
+
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      requestAnimationFrame(updateActiveLink);
+      ticking = true;
+    }
+  });
+
+  updateActiveLink();
+
+  // Add language labels to code blocks
+  document.querySelectorAll('pre code[class*="language-"]').forEach(function(code) {
+    const match = code.className.match(/language-(\w+)/);
+    if (match) {
+      code.parentElement.setAttribute('data-lang', match[1]);
+    }
+  });
+})();
+</script>
+
+  </main>
+  <footer>
+    <p>&copy; G. Marcello</p>
+  </footer>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/nim.min.js"></script>
+  <script>
+    hljs.registerAliases('nims', { languageName: 'nim' });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>

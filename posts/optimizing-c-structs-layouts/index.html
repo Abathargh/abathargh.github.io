@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>optimizing c structs layouts</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <link rel="alternate" type="application/rss+xml" title="mar@antima" href="/feed.xml">
+  <link rel="icon" type="image/png" href="/images/antima_icon.png">
+</head>
+<body>
+  <header>
+    <div class="header-top">
+      <a href="/" class="site-title">mar@antima</a>
+      <nav class="nav-links">
+        <a href="/about/">about</a>
+        <a href="/feed.xml">rss</a>
+      </nav>
+    </div>
+  </header>
+  <main>
+    <div class="post-layout">
+  <aside class="post-sidebar" id="post-sidebar">
+    <nav class="toc">
+      <div class="toc-header">On this page</div>
+      <ul class="toc-list" id="toc-list"></ul>
+    </nav>
+  </aside>
+  <article class="post">
+    <header>
+      <h1>optimizing c structs layouts</h1>
+      <time>07/12/2024</time>
+    </header>
+    <div class="content" id="post-content">
+      <p>Let's consider a simple c struct:</p>
+<pre><code class="language-c">struct foo {
+    const char * str;
+    unsigned char flag;
+    uint64_t len;
+};
+</code></pre>
+<p>Suppose that this code is being run as a part of a program executing on a 64-bit machine: what would you expect the result of <code>sizeof(struct foo)</code> to be?</p>
+<p>Most people that never had to mess with struct sizes and optimizations would guess that it should be 17...</p>
+<p>... but <em>it's 24</em>! Why is that?</p>
+<p>The reason for this behavior is that compilers optimize struct layouts for speed, and it's the modern norm that aligned memory accesses are the fastest way to access data.</p>
+<p>This means that, depending on the type of field and cpu, your data will have some alignment and will be positioned such that that alignment is respected (or, such that <code>field-address % field-alignment == 0</code>).</p>
+<h2>size, alignment, padding</h2>
+<p>In the case of the previous example, pointers and 64-bit fields are 8B aligned on 64-bit machines, and this means that, in order to force a layout where everything in the struct is aligned, the compiler will generate some padding between the <code>flag</code> and <code>len</code> fields:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/ld02w85wugogllfgaf84.png" alt="Image description" /></p>
+<p>Now let's consider another example, where a struct like this is defined, on the same machine as before:</p>
+<pre><code class="language-c">struct bar {
+    const char * str;
+    short s1;
+    int i1;
+    short s2;
+    int i2;
+};
+</code></pre>
+<p>How do we go about computing its size?</p>
+<p>There are three rules:</p>
+<ul>
+<li>Struct fields want to be aligned with their own natural alignment.</li>
+<li>The overall struct alignment is equal to the alignment of its widest field</li>
+<li>If you had to put two structs of the same type side by side, the second one should be aligned to its alignment -- this means that structs must have trailing padding up to their alignment</li>
+</ul>
+<p>Quick recap on basic types alignment and size for 64-bit machines:</p>
+<table>
+<thead>
+<tr>
+<th>type</th>
+<th>size</th>
+<th>alignment</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>char</td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>short</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td>int</td>
+<td>4</td>
+<td>4</td>
+</tr>
+<tr>
+<td>long</td>
+<td>8</td>
+<td>8</td>
+</tr>
+<tr>
+<td>float</td>
+<td>4</td>
+<td>4</td>
+</tr>
+<tr>
+<td>double</td>
+<td>8</td>
+<td>8</td>
+</tr>
+<tr>
+<td>pointers</td>
+<td>8</td>
+<td>8</td>
+</tr></tbody></table>
+<p>Also remember that:</p>
+<ul>
+<li>Arrays have the alignment of their value type, and size that is <code>sizeof(type) * elements number</code>.</li>
+<li>Unions have the alignment and size of their widest member.</li>
+</ul>
+<p>And you can use the super useful <code>sizeof</code> and <code>_Alignof</code> operators to get this information for your custom types. Note that <code>_Alignof</code> is available from C11 onward, and is called <code>alignof</code> starting with C23. It was always <code>alignof</code> from what I understand in C++, since C++11.</p>
+<p>For more information, the bible on this topic is <a href="http://www.catb.org/esr/structure-packing/">The Lost Art of Structure Packing</a>, from which I learned almost everything I know about this, together with a lot of practice and hands-on experience.</p>
+<h2>optimizing your structs: stropt</h2>
+<p>This topic here is something that comes up rather frequently at work, where saving bytes here and there is super important when sending huge loads of data continuously in queues and whatnot.</p>
+<p>In order to make my life easier, I wrote a tool that produces some statistics on a type you pass as input, with reference to a source file or code snippet, it's called <strong><em>stropt</em></strong> (struct optimizer).</p>
+<p><a href="https://github.com/Abathargh/stropt">Abathargh/stropt on GitHub</a></p>
+<h3>build &amp; install</h3>
+<p>If you have a local go installation you can go right ahead and build or install the application directly:</p>
+<pre><code class="language-bash">git clone https://github.com/Abathargh/stropt
+go build
+
+// or, if you want to install this directly
+go install github.com/Abathargh/stropt
+</code></pre>
+<p>Already compiled binaries for a list of os/archs combinations are also provided in the github release page:</p>
+<p><a href="https://github.com/Abathargh/stropt/releases">stropt binaries</a></p>
+<h3>using the tool</h3>
+<p>You can either use stropt by passing the source to analyze as a string:</p>
+<pre><code class="language-bash">stropt &quot;struct meta&quot; &quot;struct meta { int a; double d; float f[100];};&quot;
+</code></pre>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/o1x7twrzzt2t5wh6qjgr.png" alt="Image description" /></p>
+<p>Or you can pass a file in which the definition is contained:</p>
+<pre><code class="language-c">// test.c
+struct test {
+  const char * str;
+  unsigned char flag;
+  const int * const iptr;
+  char c;
+};
+</code></pre>
+<pre><code class="language-bash">stropt -file test.c &quot;struct test&quot;
+</code></pre>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/72m21ya0e4ongmvoi6h2.png" alt="Image description" /></p>
+<p>The tool can also provide a possible optimization for your types by using the <code>-optimize</code> flag, and it's aware of fields that are structs themselves:</p>
+<p><img src="https://dev-to-uploads.s3.amazonaws.com/uploads/articles/7v6780lcwtfwsg0jrjmo.png" alt="Image description" /></p>
+<p>Note that the <code>verbose</code> flag is used to show inner structs (and unions) along with their fields alignment and size.</p>
+<h2>what's next</h2>
+<p>This tool was written in go using the great <code>modernc.org/cc</code> C compiler front-end for parsing C code, and <code>lipgloss</code> from charmbracelet for the UI.</p>
+<p>I'm writing this for myself but I'm happy to share it publicly; I'd like to make this a webapp for easier use directly in a browser, so probably that's the next thing I'm going to be working on!</p>
+
+    </div>
+    <footer class="post-footer">
+      <div class="tags"><a href="/tags/c/">c</a><a href="/tags/cpp/">cpp</a><a href="/tags/go/">go</a><a href="/tags/compilers/">compilers</a><a href="/tags/languages/">languages</a></div>
+    </footer>
+  </article>
+</div>
+
+<script>
+(function() {
+  const content = document.getElementById('post-content');
+  const tocList = document.getElementById('toc-list');
+  const headings = content.querySelectorAll('h2, h3');
+
+  if (headings.length === 0) {
+    document.getElementById('post-sidebar').style.display = 'none';
+    return;
+  }
+
+  // Build TOC
+  headings.forEach((heading, index) => {
+    // Add ID to heading if missing
+    if (!heading.id) {
+      heading.id = 'section-' + index;
+    }
+
+    const li = document.createElement('li');
+    li.className = 'toc-item toc-' + heading.tagName.toLowerCase();
+
+    const a = document.createElement('a');
+    a.href = '#' + heading.id;
+    a.textContent = heading.textContent.replace(/^#+ /, '');
+    a.addEventListener('click', function(e) {
+      e.preventDefault();
+      heading.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      history.pushState(null, '', '#' + heading.id);
+    });
+
+    li.appendChild(a);
+    tocList.appendChild(li);
+  });
+
+  // Highlight current section on scroll
+  const tocLinks = tocList.querySelectorAll('a');
+  let ticking = false;
+
+  function updateActiveLink() {
+    const scrollPos = window.scrollY + 100;
+    let current = null;
+
+    headings.forEach((heading, index) => {
+      if (heading.offsetTop <= scrollPos) {
+        current = index;
+      }
+    });
+
+    tocLinks.forEach((link, index) => {
+      link.parentElement.classList.toggle('active', index === current);
+    });
+
+    ticking = false;
+  }
+
+  window.addEventListener('scroll', function() {
+    if (!ticking) {
+      requestAnimationFrame(updateActiveLink);
+      ticking = true;
+    }
+  });
+
+  updateActiveLink();
+
+  // Add language labels to code blocks
+  document.querySelectorAll('pre code[class*="language-"]').forEach(function(code) {
+    const match = code.className.match(/language-(\w+)/);
+    if (match) {
+      code.parentElement.setAttribute('data-lang', match[1]);
+    }
+  });
+})();
+</script>
+
+  </main>
+  <footer>
+    <p>&copy; G. Marcello</p>
+  </footer>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/nim.min.js"></script>
+  <script>
+    hljs.registerAliases('nims', { languageName: 'nim' });
+    hljs.highlightAll();
+  </script>
+</body>
+</html>
