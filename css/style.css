@@ -723,3 +723,344 @@ footer a:hover {
     display: block;
   }
 }
+
+/* Theme toggle */
+.theme-toggle {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.theme-toggle a {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.theme-toggle a:hover {
+  color: var(--accent);
+}
+
+/* ===========================================
+   MSN MESSENGER / WINDOWS LIVE SPACES THEME
+   circa 2006 nostalgia mode
+   =========================================== */
+
+.msn-mode {
+  --msn-blue: #1e88e5;
+  --msn-green: #4caf50;
+  --msn-orange: #ff9800;
+  --msn-pink: #e91e63;
+  --msn-bg: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 50%, #e8f5e9 100%);
+  --msn-panel: #ffffff;
+  --msn-text: #333333;
+  --msn-border: #90caf9;
+  --msn-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+
+  font-family: "Comic Sans MS", "Comic Sans", "Chalkboard SE", "Comic Neue", cursive, sans-serif !important;
+  background: var(--msn-bg) !important;
+  background-attachment: fixed !important;
+  color: var(--msn-text) !important;
+}
+
+.msn-mode * {
+  font-family: inherit !important;
+}
+
+.msn-mode code,
+.msn-mode pre,
+.msn-mode pre code {
+  font-family: "Courier New", Courier, monospace !important;
+}
+
+.msn-mode a {
+  color: var(--msn-blue);
+}
+
+.msn-mode a:hover {
+  color: var(--msn-orange);
+}
+
+/* MSN Header */
+.msn-mode > header {
+  background: linear-gradient(180deg, #4fc3f7 0%, #29b6f6 100%);
+  border: 3px solid #0288d1;
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 1.5rem;
+  box-shadow: var(--msn-shadow);
+}
+
+.msn-mode .site-title {
+  color: #fff !important;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3);
+  font-weight: bold;
+  font-size: 1.5rem;
+}
+
+.msn-mode .site-title::before {
+  content: "★ ";
+  color: #ffeb3b;
+}
+
+.msn-mode .nav-links a {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.8rem;
+}
+
+.msn-mode .nav-links a:hover {
+  background: rgba(255, 255, 255, 0.4);
+  color: #fff;
+  text-decoration: none;
+}
+
+.msn-mode .theme-toggle a {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.msn-mode .theme-toggle a:hover {
+  color: #fff;
+}
+
+/* MSN Welcome page */
+.msn-mode .welcome {
+  background: var(--msn-panel);
+  border: 3px solid var(--msn-border);
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: var(--msn-shadow);
+}
+
+.msn-mode .welcome-avatar video,
+.msn-mode .welcome-avatar img {
+  border: 4px solid var(--msn-orange);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.3);
+}
+
+.msn-mode .welcome-intro {
+  color: var(--msn-text);
+}
+
+.msn-mode .welcome-intro strong {
+  color: var(--msn-pink);
+  font-weight: bold;
+}
+
+/* MSN Post list */
+.msn-mode .posts {
+  background: var(--msn-panel);
+  border: 3px solid var(--msn-border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: var(--msn-shadow);
+}
+
+.msn-mode .posts h2 {
+  color: var(--msn-blue);
+  border-bottom: 2px dashed var(--msn-orange);
+  padding-bottom: 0.5rem;
+}
+
+.msn-mode .post-list li {
+  border-bottom: 1px dashed #bbdefb;
+}
+
+.msn-mode .post-list .post-title {
+  color: var(--msn-blue);
+  font-weight: bold;
+}
+
+.msn-mode .post-list .post-title:hover {
+  color: var(--msn-orange);
+}
+
+.msn-mode .post-list time {
+  color: var(--msn-green);
+  font-weight: bold;
+}
+
+.msn-mode .post-list .post-excerpt {
+  color: #666;
+}
+
+/* MSN Post page */
+.msn-mode .post {
+  background: var(--msn-panel);
+  border: 3px solid var(--msn-border);
+  border-radius: 16px;
+  box-shadow: var(--msn-shadow);
+  overflow: hidden;
+}
+
+.msn-mode .post > header {
+  background: linear-gradient(180deg, #81d4fa 0%, #4fc3f7 100%);
+  border-bottom: 3px solid var(--msn-border);
+}
+
+.msn-mode .post > header::before {
+  background: var(--msn-orange);
+}
+
+.msn-mode .post > header h1 {
+  color: #01579b;
+  font-weight: bold;
+}
+
+.msn-mode .post > header time {
+  color: #0277bd;
+  font-weight: bold;
+}
+
+.msn-mode .post .content {
+  color: var(--msn-text);
+}
+
+.msn-mode .post .content h2 {
+  color: var(--msn-blue);
+  border-bottom: 2px dashed var(--msn-orange);
+  font-weight: bold;
+}
+
+.msn-mode .post .content h2::before {
+  content: ">> ";
+  color: var(--msn-orange);
+}
+
+.msn-mode .post .content h3 {
+  color: var(--msn-green);
+  font-weight: bold;
+}
+
+.msn-mode .post .content h3::before {
+  content: "> ";
+  color: var(--msn-green);
+}
+
+.msn-mode .post .content strong {
+  color: var(--msn-pink);
+  font-weight: bold;
+}
+
+.msn-mode .post .content em {
+  color: var(--msn-blue);
+  font-style: italic;
+}
+
+.msn-mode .post .content a {
+  color: var(--msn-blue);
+}
+
+.msn-mode .post .content code {
+  color: var(--msn-pink);
+  background: #fce4ec;
+  border-radius: 4px;
+}
+
+.msn-mode .post .content pre {
+  background: #263238;
+  border: 3px solid var(--msn-border);
+  border-radius: 8px;
+}
+
+.msn-mode .post .content pre code {
+  color: #e0e0e0;
+  background: transparent;
+}
+
+.msn-mode .post .content blockquote {
+  border-left: 4px solid var(--msn-orange);
+  background: #fff8e1;
+  padding: 1rem;
+  border-radius: 0 8px 8px 0;
+  color: #5d4037;
+}
+
+.msn-mode .post .content li::marker {
+  color: var(--msn-orange);
+}
+
+.msn-mode .post-footer {
+  background: #e3f2fd;
+  border-top: 3px solid var(--msn-border);
+}
+
+.msn-mode .post-footer .tags a::before {
+  color: var(--msn-orange);
+}
+
+/* MSN About page */
+.msn-mode .about {
+  background: var(--msn-panel);
+  border: 3px solid var(--msn-border);
+  border-radius: 16px;
+  box-shadow: var(--msn-shadow);
+}
+
+.msn-mode .about > header {
+  background: linear-gradient(180deg, #81d4fa 0%, #4fc3f7 100%);
+  border-bottom: 3px solid var(--msn-border);
+}
+
+.msn-mode .about > header::before {
+  background: var(--msn-orange);
+}
+
+.msn-mode .about > header h1 {
+  color: #01579b;
+  font-weight: bold;
+}
+
+.msn-mode .about .content h2 {
+  color: var(--msn-blue);
+  border-bottom: 2px dashed var(--msn-orange);
+  font-weight: bold;
+}
+
+.msn-mode .about .content h2::before {
+  content: ">> ";
+  color: var(--msn-orange);
+}
+
+.msn-mode .about .content li::marker {
+  color: var(--msn-orange);
+}
+
+/* MSN Tag page */
+.msn-mode .tag-page {
+  background: var(--msn-panel);
+  border: 3px solid var(--msn-border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: var(--msn-shadow);
+}
+
+.msn-mode .tag-page h1 {
+  color: var(--msn-blue);
+}
+
+.msn-mode .tag-page h1::before {
+  content: "★ searching for: ";
+  color: var(--msn-orange);
+}
+
+/* MSN Footer */
+.msn-mode > footer {
+  background: linear-gradient(180deg, #4fc3f7 0%, #29b6f6 100%);
+  border: 3px solid #0288d1;
+  border-radius: 12px;
+  padding: 1rem;
+  text-align: center;
+  color: #fff;
+  box-shadow: var(--msn-shadow);
+}
+
+.msn-mode > footer p {
+  color: #fff;
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.2);
+}
+
+.msn-mode > footer a {
+  color: #ffeb3b;
+}

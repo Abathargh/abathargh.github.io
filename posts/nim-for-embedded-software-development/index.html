@@ -20,6 +20,9 @@
         <a href="/feed.xml">rss</a>
       </nav>
     </div>
+    <div class="theme-toggle">
+      <a href="#" id="theme-toggle-btn">~ switch to msn mode ~</a>
+    </div>
   </header>
   <main>
     <div class="post-layout">
@@ -313,6 +316,21 @@ proc timer0_compa_isr() {.isr(Timer0CompAVect).} =
   <script>
     hljs.registerAliases('nims', { languageName: 'nim' });
     hljs.highlightAll();
+
+    // MSN theme toggle
+    const toggleBtn = document.getElementById('theme-toggle-btn');
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'msn') {
+      document.body.classList.add('msn-mode');
+      toggleBtn.textContent = '~ back to normal ~';
+    }
+    toggleBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      document.body.classList.toggle('msn-mode');
+      const isMsn = document.body.classList.contains('msn-mode');
+      localStorage.setItem('theme', isMsn ? 'msn' : 'default');
+      toggleBtn.textContent = isMsn ? '~ back to normal ~' : '~ switch to msn mode ~';
+    });
   </script>
 </body>
 </html>

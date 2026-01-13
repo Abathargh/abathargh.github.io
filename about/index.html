@@ -20,6 +20,9 @@
         <a href="/feed.xml">rss</a>
       </nav>
     </div>
+    <div class="theme-toggle">
+      <a href="#" id="theme-toggle-btn">~ switch to msn mode ~</a>
+    </div>
   </header>
   <main>
     <article class="about">
@@ -29,15 +32,19 @@
   <div class="content">
     <h2>Background</h2>
 <ul>
-<li>I am a Software Engineer, mainly working on embedded systems as a firmware developer for NTT Data Italy (Cortex-M series, Smart metering, Real-time systems, IoT systems).</li>
-<li>B.Eng (Laurea in Ingegneria) in Computer Engineering from the Università della Calabria (UNICAL)
-<ul>
-<li>Thesis: A study on technological solutions for the analysis and classification of human activities based on M2M communication systems and models</li>
+<li>I am a Software Engineer, with 5+ years of experience working on embedded
+systems for NTT Data Italy (Cortex-M series, x86, Smart metering,</li>
 </ul>
-</li>
-<li>On my way to graduate with a Master's Degree (Laurea Magistrale in Ingegneria) in Computer Engineering for the Internet of Things at Università della Calabria (UNICAL)</li>
+<p>Real-time systems, IoT systems).</p>
+<ul>
+<li>I hold a B.Eng (Laurea in Ingegneria) in Computer Engineering from the
+Università della Calabria (UNICAL)</li>
 </ul>
 <h2>Music</h2>
+<p><strong>iamthesun</strong>, Guitar/Composer (Alt./Prog Metal)</p>
+<ul>
+<li>New project, check the latest demos <a href="https://soundcloud.com/abathargh">@soundcloud</a></li>
+</ul>
 <p><strong>Dripping Sin</strong>, Guitar/Voices (Thrash/Alt. Metal)</p>
 <ul>
 <li>Gaze into the Abyss (2017) - <a href="https://soundcloud.com/dripping-sin/sets/gaze-into-the-abyss">Soundcloud</a> - <a href="https://open.spotify.com/album/2Nyg0Q398ANg7YLA56Ci8o">Spotify</a></li>
@@ -51,13 +58,13 @@
 <h2>Projects</h2>
 <ul>
 <li><a href="https://antima.it">antima.it</a> (2019 - Present), a website that I manage and in which I write, mainly about programming and computer engineering.</li>
-<li><a href="https://github.com/Abathargh/avr_io">AVR register mappings and ISR support for nim</a>, a collection of mappings and utilities for various AVR-based chips (mainly ATMega ones), inspired from the avr-gcc internals.
+<li><a href="https://github.com/Abathargh/avr_io">AVR register mappings and ISR support for nim</a>, a collection of mappings and utilities for various AVR-based chips, inspired from the avr-gcc internals.
 <ul>
 <li>A presentation in which I spoke about this project <a href="https://www.youtube.com/watch?v=V9ranijNu40">@NimConf24</a>.</li>
 </ul>
 </li>
 <li><a href="https://github.com/Abathargh/harlock">Harlock v0.5.1</a> (2022 - Present), a small interpreted language that can be used as a DSL for hex/elf files manipulation.</li>
-<li><a href="https://github.com/Abathargh/moody-go">Moody</a> (2021 - Present), a WSAN architecture for managing local-first intranet of things networks for home automation purposes.</li>
+<li><a href="https://github.com/Abathargh/moody-go">Moody</a> (2021), a WSAN architecture for managing local-first intranet of things networks for home automation purposes.</li>
 <li><a href="https://github.com/Abathargh/shimmer-listener">shimmer-listener</a> (2021), a library to process bluetooth data from a shimmer2 running tinyos.</li>
 </ul>
 <h2>Useful stuff</h2>
@@ -89,6 +96,21 @@
   <script>
     hljs.registerAliases('nims', { languageName: 'nim' });
     hljs.highlightAll();
+
+    // MSN theme toggle
+    const toggleBtn = document.getElementById('theme-toggle-btn');
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'msn') {
+      document.body.classList.add('msn-mode');
+      toggleBtn.textContent = '~ back to normal ~';
+    }
+    toggleBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      document.body.classList.toggle('msn-mode');
+      const isMsn = document.body.classList.contains('msn-mode');
+      localStorage.setItem('theme', isMsn ? 'msn' : 'default');
+      toggleBtn.textContent = isMsn ? '~ back to normal ~' : '~ switch to msn mode ~';
+    });
   </script>
 </body>
 </html>
